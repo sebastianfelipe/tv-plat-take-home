@@ -15,10 +15,9 @@ export class UsersRepository {
   }
 
   async findById(userId: string): Promise<User | undefined> {
-    const result = await this.db.query<User>(
-      'SELECT id, name, role FROM users WHERE id = $1',
-      [userId],
-    );
+    const result = await this.db.query<User>('SELECT id, name, role FROM users WHERE id = $1', [
+      userId,
+    ]);
     return result.rows[0];
   }
 }
