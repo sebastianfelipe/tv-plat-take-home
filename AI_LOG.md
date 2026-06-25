@@ -34,6 +34,7 @@
 - "Add dedicated `test/access-control.test.ts` for role-based integration scenarios; keep auth/validation tests in route-specific files."
 - "Add unit tests for `UsersService.findUserResources` (404 when owner missing, loads when owner exists)."
 - "Review test gaps against implemented features — shared resources, auth edge cases, validation boundaries, service-layer unit tests."
+- "Add unit tests for `ResourcesService.buildRestrictedWhere`, `findResources` merge behavior, and `parseUserId`."
 
 ## Assumptions
 
@@ -88,18 +89,21 @@
 - **Accepted:** `UsersService.findUserResources` unit tests — `NotFoundError` when owner missing; delegates to `findResourcesByOwner` when owner exists.
 - **Rejected:** Duplicating scoping assertions in `resources.test.ts` and `users.test.ts` once covered by `access-control.test.ts`.
 - **Accepted:** Unit and integration tests for users domain in `test/users.test.ts` (`authorizeOwner`, `findUserResources`, auth integration).
+- **Accepted:** `test/resources.service.test.ts` — unit tests for `buildRestrictedWhere` (admin/member/missing user), `findResources` merge (restriction wins on `ownerId` conflict), and `findRecentResources` scoped preset; mocked repository + `UsersService`, no DB.
+- **Accepted:** `test/auth.test.ts` — unit tests for `parseUserId` (positive ids, bigint strings above `Number.MAX_SAFE_INTEGER`, rejects non-numeric/zero/negative).
 - **Accepted:** `UserRole` enum (`Member`, `Admin`) in `users.types.ts` — string values match postgres `role` column; used in `authorizeOwner` and tests.
 - **Corrected:** Dropped hardcoded `type` / `status` unions and Joi `.valid()` allowlists — `resources.type` and `resources.status` are plain `text` in `0001_init.sql`; `ResourcesWhere` and `resourcesWhereSchema` accept any string. Order field allowlist (`id`, `created_at`) unchanged.
 
 ## How I verified AI-generated code
 
 - Cross-checked onboarding summary against `src/*.ts`, migrations, seed, and tests.
-- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (26 total: 10 access-control integration, 9 users unit/integration, 7 resources validation/auth).
+- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (37 total: 10 access-control integration, 9 users unit/integration, 7 resources validation/auth, 7 resources service unit, 4 auth unit).
 - Verified member (user 2) on `GET /resources` sees only 8 owned resources; admin (user 1) still sees all 30.
 - Verified member on `GET /resources/recent` sees 8 owned resources (most recent id `30`); admin sees global top 10.
 - Verified admin `GET /users/:userId/resources` returns 404 when path owner does not exist.
 - Manually reviewed parameterized SQL in `resources.repository.ts` (typed order fields after controller validation, no string interpolation of user input).
-- Verified `parseUserId()` accepts ids above `Number.MAX_SAFE_INTEGER` and rejects non-numeric headers via `requireAuth`.
+- Verified `parseUserId()` via `test/auth.test.ts` — accepts ids above `Number.MAX_SAFE_INTEGER`; rejects non-numeric, zero, and negative values.
+- Verified `ResourcesService.buildRestrictedWhere` and merge behavior via `test/resources.service.test.ts` (admin → `{}`, member → `{ ownerId }`, restriction overrides filter `where`).
 - Verified unknown user id (`9007199254740992`) returns 401 on protected routes.
 - Verified admin (user 1) can list another user's resources; member (user 2) gets 403 on user 3's resources.
-- **TODO (tests):** `resource_shares` access once implemented; auth edge cases (malformed/zero/bigint header on all routes); `ResourcesService.buildRestrictedWhere` unit tests; validation boundaries (`limit` max, bad order direction).
+- **TODO (tests):** `resource_shares` access once implemented; auth integration edge cases (malformed/zero/bigint header on all protected routes); validation boundaries (`limit` max, bad order direction); member 403 vs admin 404 for missing path owner; invalid path param on `/users/:userId/resources`.
