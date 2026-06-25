@@ -37,12 +37,34 @@
 - "Add unit tests for `ResourcesService.buildRestrictedWhere`, `findResources` merge behavior, and `parseUserId`."
 - "Extend member access to shared resources via `resource_shares`; admins see all; paginate scoped results."
 - "Replace `buildRestrictedWhere` with `buildAccessScope` returning `{ userId? }`; pass scope object through controller/service."
+- "Verify solution end-to-end; update README and PR_DESCRIPTION for deliverables."
+- "Document design considerations and decisions in PR write-up; update AI_LOG."
+- "Add indexes for owner_id, shares, type, status, and created_at sort in a separate migration."
 
 ## Assumptions
 
 - **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. `requireAuth` then confirms the id exists in `users` via `UsersService.findById()` (401 if missing or unknown). Members on global list endpoints see resources they **own or that are shared with them** via `resource_shares`; admins see all. `GET /users/:userId/resources` lists resources **owned by** the path user only (no shares on that endpoint).
 - **User ids as strings:** `users.id` is postgres `bigint`. JavaScript `number` is not safe for the full 64-bit range, so `req.userId`, path params, and `ownerId` filters use decimal strings end-to-end to match pg's default bigint wire format.
 - **Owner authorization:** `authorizeOwner(userId, ownerId)` runs in the controller before `findUserResources(ownerId)`. Admins may read any user's resources; members may only read their own (`userId === ownerId`). `findUserResources` then confirms the path owner exists (404 if not).
+
+- **Deliverables:** `README.md` updated (layout, auth, endpoints, query params, test count). `PR_DESCRIPTION.md` filled with summary, changes, design decisions, testing, and trade-offs. `AI_LOG.md` maintained throughout.
+
+## Design decisions (summary)
+
+Key choices made for software quality — full rationale in `PR_DESCRIPTION.md`:
+
+- **Domain layout** (`resources/`, `users/`) over flat technical layers — feature cohesion, thin `app.ts`.
+- **Shared `findResources()` with explicit blast radius** — one SQL path; service applies scope, repository executes it.
+- **`authStub` attaches, `requireAuth` rejects** — malformed headers don’t 401 globally; protected routes enforce identity.
+- **`buildAccessScope` → `AccessScope` object** — scope separated from caller filters; no merged-where hacks.
+- **`EXISTS` for `resource_shares`** — pagination-safe; no duplicate rows when owned and shared overlap.
+- **User ids as bigint strings** — `parseUserId()` + `BigInt`; no `Number()` precision loss.
+- **403 / 404 / 401 split** — authorization vs existence vs identity at the right layer.
+- **`GET /users/:userId/resources` owner-only** — global lists include shares; user route lists owned resources.
+- **Controller validates, repository parameterizes** — order allowlist and Joi at edge; no user input in SQL fragments.
+- **Global error handler + `asyncHandler`** — services throw; routes stay thin.
+- **Dedicated `test/access-control.test.ts`** — role matrix without duplicating assertions across route tests.
+- **Incremental index migrations** — `0002` for share recipient lookups; `0003` for `type`, `status`, `created_at`, and owner+recency composites; `ORDER BY id` uses PK; share `EXISTS` uses `resource_shares` PK.
 
 ## Where I accepted / rejected / corrected AI output
 
@@ -80,6 +102,7 @@
 - **Rejected:** `buildRestrictedWhere` returning a merged `FindResourcesWhere` — replaced with `buildAccessScope(userId)` returning `AccessScope` (`{ userId? }`); admin → `{}`, member → `{ userId }`; service maps to `where.accessScopeUserId` for repository.
 - **Accepted:** Member scoping in shared `findResources()` via `EXISTS` subquery on `resource_shares` (not JOIN) — owned OR shared, no row duplication, pagination safe.
 - **Accepted:** `0002_resource_shares_user_id_idx.sql` — index on `resource_shares(user_id)` for scoped lookups.
+- **Accepted:** `0003_resource_query_indexes.sql` — `idx_resources_type`, `idx_resources_status`, `idx_resources_type_status`, `idx_resources_created_at` (DESC), `idx_resources_owner_id_created_at`; documented mapping to `findResources()` filters and sorts; PK covers `ORDER BY id` and share `EXISTS (resource_id, user_id)`.
 - **Accepted:** `GET /resources` / `GET /resources/recent` controller calls `buildAccessScope(userId)` then passes `AccessScope` to service; `findResourcesByOwner` still uses `ownerId` only for user-scoped endpoint.
 - **Corrected:** Seed comment for share `{ resourceId: 10, userId: 2 }` — original comment preserved; added note that owner/share overlap is intentional for dedup testing.
 - **Rejected:** Separate `users.authorization.ts` module — kept `authorizeOwner` on `UsersService`.
@@ -97,6 +120,8 @@
 - **Accepted:** `test/auth.test.ts` — unit tests for `parseUserId` (positive ids, bigint strings above `Number.MAX_SAFE_INTEGER`, rejects non-numeric/zero/negative).
 - **Accepted:** `UserRole` enum (`Member`, `Admin`) in `users.types.ts` — string values match postgres `role` column; used in `authorizeOwner` and tests.
 - **Corrected:** Dropped hardcoded `type` / `status` unions and Joi `.valid()` allowlists — `resources.type` and `resources.status` are plain `text` in `0001_init.sql`; `ResourcesWhere` and `resourcesWhereSchema` accept any string. Order field allowlist (`id`, `created_at`) unchanged.
+- **Accepted:** `README.md` and `PR_DESCRIPTION.md` updated for submission — current layout, auth behavior, endpoint scoping, query params, 37-test suite, design decisions section.
+- **Corrected:** Stale route comment in `users.routes.ts` claiming `/resources` endpoints were unauthenticated.
 
 ## How I verified AI-generated code
 
@@ -110,4 +135,6 @@
 - Verified `ResourcesService.buildAccessScope` and repository scoping via unit + integration tests (admin → no scope, member → owned + shared, pagination under scope).
 - Verified unknown user id (`9007199254740992`) returns 401 on protected routes.
 - Verified admin (user 1) can list another user's resources; member (user 2) gets 403 on user 3's resources.
-- **TODO (tests):** auth integration edge cases (malformed/zero/bigint header on all protected routes); validation boundaries (`limit` max, bad order direction); member 403 vs admin 404 for missing path owner; invalid path param on `/users/:userId/resources`.
+- Reviewed `PR_DESCRIPTION.md` design decisions against implemented code paths (`buildAccessScope`, repository `EXISTS`, error semantics).
+- Mapped `0003` indexes to repository WHERE/ORDER BY clauses; confirmed migrations apply cleanly via test `beforeAll` migrate.
+- **Deferred (non-blocking):** auth integration edge cases on every protected route; validation boundary tests (`limit` 101, bad order direction); member 403 vs admin 404 for missing path owner; invalid path param on `/users/:userId/resources`.
