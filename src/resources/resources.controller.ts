@@ -50,9 +50,11 @@ export class ResourcesController {
     }
   };
 
-  findRecentResources = async (_req: Request, res: Response, next: NextFunction) => {
+  findRecentResources = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const resources = await this.service.findRecentResources();
+      const { userId } = req as Request & { userId: string };
+      const restrictedWhere = await this.service.buildRestrictedWhere(userId);
+      const resources = await this.service.findRecentResources(restrictedWhere);
       res.json(resources);
     } catch (err) {
       next(err);

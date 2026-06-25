@@ -65,11 +65,16 @@ export class ResourcesService {
     return this.repository.findResources(params);
   }
 
-  findRecentResources(): Promise<ResourceRow[]> {
+  findRecentResources(restrictedWhere?: FindResourcesWhere): Promise<ResourceRow[]> {
     const params: FindResourcesParams = {
       limit: 10,
       order: { field: 'created_at', direction: 'desc' },
     };
+
+    if (restrictedWhere !== undefined) {
+      params.where = restrictedWhere;
+    }
+
     return this.repository.findResources(params);
   }
 
