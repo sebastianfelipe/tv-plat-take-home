@@ -2,8 +2,8 @@ import Joi from 'joi';
 import type { FindResourcesOrder, ResourcesWhere } from './resources.types';
 
 export const resourcesWhereSchema = Joi.object<ResourcesWhere>({
-  type: Joi.string().valid('doc', 'sheet', 'slide'),
-  status: Joi.string().valid('draft', 'published', 'archived'),
+  type: Joi.string(),
+  status: Joi.string(),
 });
 
 export const resourcesOrderSchema = Joi.object<FindResourcesOrder>({

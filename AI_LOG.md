@@ -27,6 +27,7 @@
 - "Wire `buildRestrictedWhere` at resources controller for `GET /resources`; pass `restrictedWhere` as second arg to `findResources` and merge in service."
 - "Apply same `buildRestrictedWhere` policy to `GET /resources/recent`; `findRecentResources` accepts only `restrictedWhere`."
 - "Validate user existence in `requireAuth` via `UsersService.findById`; reject unknown ids with 401."
+- "Remove `type` / `status` enum restrictions on resource filters — migration uses unconstrained `text` columns."
 
 ## Assumptions
 
@@ -74,6 +75,7 @@
 - **Rejected:** `{ ok: true | false }` return from `authorizeOwner` alongside `ForbiddenError` catch — service throws, controller catches once.
 - **Accepted:** Unit and integration tests for users domain in single `test/users.test.ts`.
 - **Accepted:** `UserRole` enum (`Member`, `Admin`) in `users.types.ts` — string values match postgres `role` column; used in `authorizeOwner` and tests.
+- **Corrected:** Dropped hardcoded `type` / `status` unions and Joi `.valid()` allowlists — `resources.type` and `resources.status` are plain `text` in `0001_init.sql`; `ResourcesWhere` and `resourcesWhereSchema` accept any string. Order field allowlist (`id`, `created_at`) unchanged.
 
 ## How I verified AI-generated code
 

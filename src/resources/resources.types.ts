@@ -1,8 +1,8 @@
 import type { FindQuery, OrderDirection } from '../shared/query.types';
 
 export interface ResourcesWhere {
-  type?: 'doc' | 'sheet' | 'slide';
-  status?: 'draft' | 'published' | 'archived';
+  type?: string;
+  status?: string;
 }
 
 export type FindResourcesOrderField = 'id' | 'created_at';

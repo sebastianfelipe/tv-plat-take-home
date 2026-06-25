@@ -3,8 +3,8 @@ import { UserRole } from '../users/users.types';
 import { buildFindResourcesParams } from './resources.params';
 import { ResourcesRepository } from './resources.repository';
 import type {
-  FindResourcesWhere,
   FindResourcesParams,
+  FindResourcesWhere,
   ResourceRow,
   ResourcesFilter,
 } from './resources.types';
