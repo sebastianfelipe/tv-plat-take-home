@@ -41,15 +41,15 @@ export class ResourcesController {
 
     const filter = parsed.value;
     const { userId } = req as Request & { userId: string };
-    const restrictedWhere = await this.service.buildRestrictedWhere(userId);
-    const resources = await this.service.findResources(filter, restrictedWhere);
+    const accessScope = await this.service.buildAccessScope(userId);
+    const resources = await this.service.findResources(filter, accessScope);
     res.json(resources);
   };
 
   findRecentResources = async (req: Request, res: Response) => {
     const { userId } = req as Request & { userId: string };
-    const restrictedWhere = await this.service.buildRestrictedWhere(userId);
-    const resources = await this.service.findRecentResources(restrictedWhere);
+    const accessScope = await this.service.buildAccessScope(userId);
+    const resources = await this.service.findRecentResources(accessScope);
     res.json(resources);
   };
 }

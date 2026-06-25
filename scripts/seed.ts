@@ -16,6 +16,8 @@ const STATUSES = ['draft', 'published', 'archived'];
 const RESOURCE_COUNT = 30;
 
 // A handful of explicit shares so "shared access" is testable.
+// Note: resource 10 is owned by user 2 and also shared with user 2 — SQL OR scoping
+// dedupes this; kept intentionally to exercise overlap in access-control tests.
 // (resource_id, user_id) — none of these share a resource with its own owner.
 const SHARES: Array<{ resourceId: number; userId: number }> = [
   { resourceId: 1, userId: 2 }, // owner 1, shared with 2

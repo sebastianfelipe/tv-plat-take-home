@@ -3,8 +3,8 @@ import { UserRole } from '../users/users.types';
 import { buildFindResourcesParams } from './resources.params';
 import { ResourcesRepository } from './resources.repository';
 import type {
+  AccessScope,
   FindResourcesParams,
-  FindResourcesWhere,
   ResourceRow,
   ResourcesFilter,
 } from './resources.types';
@@ -43,36 +43,35 @@ export class ResourcesService {
     return ResourcesService.instance;
   }
 
-  async buildRestrictedWhere(userId: string): Promise<FindResourcesWhere> {
+  async buildAccessScope(userId: string): Promise<AccessScope> {
     const user = await this.usersService.findById(userId);
     if (user?.role === UserRole.Admin) {
       return {};
     }
 
-    return { ownerId: userId };
+    return { userId };
   }
 
-  findResources(
-    filter?: ResourcesFilter,
-    restrictedWhere?: FindResourcesWhere,
-  ): Promise<ResourceRow[]> {
+  findResources(filter?: ResourcesFilter, accessScope: AccessScope = {}): Promise<ResourceRow[]> {
     const params = buildFindResourcesParams(filter);
+    const { userId: accessScopeUserId } = accessScope;
 
-    if (restrictedWhere !== undefined) {
-      params.where = { ...params.where, ...restrictedWhere };
+    if (accessScopeUserId !== undefined) {
+      params.where = { ...params.where, accessScopeUserId };
     }
 
     return this.repository.findResources(params);
   }
 
-  findRecentResources(restrictedWhere?: FindResourcesWhere): Promise<ResourceRow[]> {
+  findRecentResources(accessScope: AccessScope = {}): Promise<ResourceRow[]> {
     const params: FindResourcesParams = {
       limit: 10,
       order: { field: 'created_at', direction: 'desc' },
     };
+    const { userId: accessScopeUserId } = accessScope;
 
-    if (restrictedWhere !== undefined) {
-      params.where = restrictedWhere;
+    if (accessScopeUserId !== undefined) {
+      params.where = { accessScopeUserId };
     }
 
     return this.repository.findResources(params);

@@ -35,10 +35,12 @@
 - "Add unit tests for `UsersService.findUserResources` (404 when owner missing, loads when owner exists)."
 - "Review test gaps against implemented features — shared resources, auth edge cases, validation boundaries, service-layer unit tests."
 - "Add unit tests for `ResourcesService.buildRestrictedWhere`, `findResources` merge behavior, and `parseUserId`."
+- "Extend member access to shared resources via `resource_shares`; admins see all; paginate scoped results."
+- "Replace `buildRestrictedWhere` with `buildAccessScope` returning `{ userId? }`; pass scope object through controller/service."
 
 ## Assumptions
 
-- **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. `requireAuth` then confirms the id exists in `users` via `UsersService.findById()` (401 if missing or unknown). **TODO:** extend member access to shared resources via `resource_shares`.
+- **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. `requireAuth` then confirms the id exists in `users` via `UsersService.findById()` (401 if missing or unknown). Members on global list endpoints see resources they **own or that are shared with them** via `resource_shares`; admins see all. `GET /users/:userId/resources` lists resources **owned by** the path user only (no shares on that endpoint).
 - **User ids as strings:** `users.id` is postgres `bigint`. JavaScript `number` is not safe for the full 64-bit range, so `req.userId`, path params, and `ownerId` filters use decimal strings end-to-end to match pg's default bigint wire format.
 - **Owner authorization:** `authorizeOwner(userId, ownerId)` runs in the controller before `findUserResources(ownerId)`. Admins may read any user's resources; members may only read their own (`userId === ownerId`). `findUserResources` then confirms the path owner exists (404 if not).
 
@@ -70,14 +72,16 @@
 - **Accepted:** Split `authStub` (attach valid `req.userId`) + async `requireAuth` (401 when unset or user not found via `UsersService.findById`); `requireAuth` on users and resources routes; path param validated with same `parseUserId()` helper.
 - **Accepted:** Unknown-but-well-formed `x-user-id` returns 401 from `requireAuth` (not 403 from `authorizeOwner`) — identity does not exist.
 - **Accepted:** `UsersService.authorizeOwner(userId, ownerId)` called from controller before `findUserResources`; throws `ForbiddenError` → global `errorHandler` returns 403.
-- **Accepted:** `User` interface (`id`, `name`, `role`) in `users.types.ts`; `UsersRepository.findById()` returns full user row; `UsersService.findById()` as the service-layer lookup used by `authorizeOwner` and `ResourcesService.buildRestrictedWhere`.
+- **Accepted:** `User` interface (`id`, `name`, `role`) in `users.types.ts`; `UsersRepository.findById()` returns full user row; `UsersService.findById()` as the service-layer lookup used by `authorizeOwner` and `ResourcesService.buildAccessScope`.
 - **Accepted:** `ResourcesService` injects `UsersService` (optional in `getInstance` for tests); `UsersService.getInstance()` wires itself back into `ResourcesService` after bootstrap (resources routes register first in `app.ts`).
 - **Rejected:** Lazy `require()` for `UsersService` in `ResourcesService` — failed under Vitest; explicit singleton wiring instead.
 - **Rejected:** `ResourcesService` calling `UsersRepository` directly — role lookups go through `UsersService.findById`.
 - **Rejected:** Module-level `export const usersService` / `resourcesService` singletons — caused circular import at load time; controllers call `getInstance()` instead.
-- **Accepted:** `ResourcesService.buildRestrictedWhere(userId)` — admin → `{}` (no filter); member → `{ ownerId: userId }`.
-- **Accepted:** `GET /resources` controller calls `buildRestrictedWhere(userId)` then `findResources(filter, restrictedWhere)`; service merges `{ ...filter.where, ...restrictedWhere }` so access restrictions win on conflicts.
-- **Accepted:** `GET /resources/recent` controller calls `buildRestrictedWhere(userId)` then `findRecentResources(restrictedWhere)`; service applies `restrictedWhere` to the fixed preset (limit 10, `created_at desc`) with no caller-supplied filter.
+- **Rejected:** `buildRestrictedWhere` returning a merged `FindResourcesWhere` — replaced with `buildAccessScope(userId)` returning `AccessScope` (`{ userId? }`); admin → `{}`, member → `{ userId }`; service maps to `where.accessScopeUserId` for repository.
+- **Accepted:** Member scoping in shared `findResources()` via `EXISTS` subquery on `resource_shares` (not JOIN) — owned OR shared, no row duplication, pagination safe.
+- **Accepted:** `0002_resource_shares_user_id_idx.sql` — index on `resource_shares(user_id)` for scoped lookups.
+- **Accepted:** `GET /resources` / `GET /resources/recent` controller calls `buildAccessScope(userId)` then passes `AccessScope` to service; `findResourcesByOwner` still uses `ownerId` only for user-scoped endpoint.
+- **Corrected:** Seed comment for share `{ resourceId: 10, userId: 2 }` — original comment preserved; added note that owner/share overlap is intentional for dedup testing.
 - **Rejected:** Separate `users.authorization.ts` module — kept `authorizeOwner` on `UsersService`.
 - **Rejected:** `{ ok: true | false }` return from `authorizeOwner` alongside `ForbiddenError` catch — service throws, global handler maps errors.
 - **Accepted:** Global `errorHandler` in `middleware/error-handler.ts` registered last in `app.ts`; `HttpError` base + `ForbiddenError` in `shared/errors.ts`; unknown errors → 500.
@@ -89,7 +93,7 @@
 - **Accepted:** `UsersService.findUserResources` unit tests — `NotFoundError` when owner missing; delegates to `findResourcesByOwner` when owner exists.
 - **Rejected:** Duplicating scoping assertions in `resources.test.ts` and `users.test.ts` once covered by `access-control.test.ts`.
 - **Accepted:** Unit and integration tests for users domain in `test/users.test.ts` (`authorizeOwner`, `findUserResources`, auth integration).
-- **Accepted:** `test/resources.service.test.ts` — unit tests for `buildRestrictedWhere` (admin/member/missing user), `findResources` merge (restriction wins on `ownerId` conflict), and `findRecentResources` scoped preset; mocked repository + `UsersService`, no DB.
+- **Accepted:** `test/resources.service.test.ts` — unit tests for `buildAccessScope` (admin/member/missing user), `findResources` scope wiring, and `findRecentResources` scoped preset; mocked repository + `UsersService`, no DB.
 - **Accepted:** `test/auth.test.ts` — unit tests for `parseUserId` (positive ids, bigint strings above `Number.MAX_SAFE_INTEGER`, rejects non-numeric/zero/negative).
 - **Accepted:** `UserRole` enum (`Member`, `Admin`) in `users.types.ts` — string values match postgres `role` column; used in `authorizeOwner` and tests.
 - **Corrected:** Dropped hardcoded `type` / `status` unions and Joi `.valid()` allowlists — `resources.type` and `resources.status` are plain `text` in `0001_init.sql`; `ResourcesWhere` and `resourcesWhereSchema` accept any string. Order field allowlist (`id`, `created_at`) unchanged.
@@ -97,13 +101,13 @@
 ## How I verified AI-generated code
 
 - Cross-checked onboarding summary against `src/*.ts`, migrations, seed, and tests.
-- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (37 total: 10 access-control integration, 9 users unit/integration, 7 resources validation/auth, 7 resources service unit, 4 auth unit).
-- Verified member (user 2) on `GET /resources` sees only 8 owned resources; admin (user 1) still sees all 30.
-- Verified member on `GET /resources/recent` sees 8 owned resources (most recent id `30`); admin sees global top 10.
+- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (37 total: 11 access-control integration, 9 users unit/integration, 7 resources validation/auth, 6 resources service unit, 4 auth unit).
+- Verified member (user 2) on `GET /resources` sees 9 accessible resources (8 owned + 1 shared-only); admin (user 1) still sees all 30.
+- Verified member on `GET /resources/recent` sees 9 accessible resources including shared resource `1`; admin sees global top 10.
 - Verified admin `GET /users/:userId/resources` returns 404 when path owner does not exist.
 - Manually reviewed parameterized SQL in `resources.repository.ts` (typed order fields after controller validation, no string interpolation of user input).
 - Verified `parseUserId()` via `test/auth.test.ts` — accepts ids above `Number.MAX_SAFE_INTEGER`; rejects non-numeric, zero, and negative values.
-- Verified `ResourcesService.buildRestrictedWhere` and merge behavior via `test/resources.service.test.ts` (admin → `{}`, member → `{ ownerId }`, restriction overrides filter `where`).
+- Verified `ResourcesService.buildAccessScope` and repository scoping via unit + integration tests (admin → no scope, member → owned + shared, pagination under scope).
 - Verified unknown user id (`9007199254740992`) returns 401 on protected routes.
 - Verified admin (user 1) can list another user's resources; member (user 2) gets 403 on user 3's resources.
-- **TODO (tests):** `resource_shares` access once implemented; auth integration edge cases (malformed/zero/bigint header on all protected routes); validation boundaries (`limit` max, bad order direction); member 403 vs admin 404 for missing path owner; invalid path param on `/users/:userId/resources`.
+- **TODO (tests):** auth integration edge cases (malformed/zero/bigint header on all protected routes); validation boundaries (`limit` max, bad order direction); member 403 vs admin 404 for missing path owner; invalid path param on `/users/:userId/resources`.

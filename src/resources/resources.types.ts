@@ -14,6 +14,8 @@ export interface FindResourcesOrder {
 
 export interface FindResourcesWhere extends ResourcesWhere {
   ownerId?: string;
+  /** Member access scope: owned resources plus rows shared via resource_shares. */
+  accessScopeUserId?: string;
 }
 
 export interface FindResourcesParams {
@@ -24,6 +26,10 @@ export interface FindResourcesParams {
 }
 
 export type ResourcesFilter = FindQuery<ResourcesWhere>;
+
+export interface AccessScope {
+  userId?: string;
+}
 
 export interface ResourceRow {
   id: string;

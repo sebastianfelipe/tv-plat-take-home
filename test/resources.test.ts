@@ -35,12 +35,11 @@ describe('GET /resources', () => {
   });
 
   it('filters by where, paginates, and orders validated query params', async () => {
-    const res = await authedGet('/resources')
-      .query({
-        where: JSON.stringify({ type: 'doc', status: 'draft' }),
-        limit: 5,
-        order: JSON.stringify({ field: 'id', direction: 'asc' }),
-      });
+    const res = await authedGet('/resources').query({
+      where: JSON.stringify({ type: 'doc', status: 'draft' }),
+      limit: 5,
+      order: JSON.stringify({ field: 'id', direction: 'asc' }),
+    });
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(5);
@@ -51,8 +50,7 @@ describe('GET /resources', () => {
   it('paginates with skip', async () => {
     const order = JSON.stringify({ field: 'id', direction: 'asc' });
     const firstPage = await authedGet('/resources').query({ limit: 5, order });
-    const secondPage = await authedGet('/resources')
-      .query({ limit: 5, skip: 5, order });
+    const secondPage = await authedGet('/resources').query({ limit: 5, skip: 5, order });
 
     expect(firstPage.status).toBe(200);
     expect(secondPage.status).toBe(200);
@@ -60,8 +58,9 @@ describe('GET /resources', () => {
   });
 
   it('returns 400 for an unsupported order field', async () => {
-    const res = await authedGet('/resources')
-      .query({ order: JSON.stringify({ field: 'title', direction: 'asc' }) });
+    const res = await authedGet('/resources').query({
+      order: JSON.stringify({ field: 'title', direction: 'asc' }),
+    });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid query parameters');

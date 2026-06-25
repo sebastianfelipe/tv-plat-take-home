@@ -16,9 +16,14 @@ const OWNED_COUNT: Record<string, number> = {
   '3': 7,
   '4': 7,
 };
+// Owned plus resource_shares rows (deduped by OR in SQL).
+const ACCESSIBLE_COUNT: Record<string, number> = {
+  '2': 9, // + resource 1 (shared from owner 1)
+  '3': 9, // + resources 2, 14 (shared from owner 2)
+  '4': 8, // + resource 5 (shared from owner 1)
+};
 
-const authedGet = (userId: string, path: string) =>
-  request(app).get(path).set('x-user-id', userId);
+const authedGet = (userId: string, path: string) => request(app).get(path).set('x-user-id', userId);
 
 beforeAll(async () => {
   await migrate();
@@ -49,24 +54,42 @@ describe('access control — admin global lists', () => {
 });
 
 describe('access control — member scoped lists', () => {
-  it('lists only owned resources on GET /resources', async () => {
+  it('lists owned and shared resources on GET /resources', async () => {
     const res = await authedGet(MEMBER_ID, '/resources');
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(OWNED_COUNT[MEMBER_ID]);
-    expect(res.body.every((r: { owner_id: string }) => r.owner_id === MEMBER_ID)).toBe(true);
+    expect(res.body).toHaveLength(ACCESSIBLE_COUNT[MEMBER_ID]);
+    expect(
+      res.body
+        .map((r: { id: string }) => r.id)
+        .sort((a: string, b: string) => Number(a) - Number(b)),
+    ).toEqual(['1', '2', '6', '10', '14', '18', '22', '26', '30']);
+    expect(res.body.some((r: { owner_id: string }) => r.owner_id !== MEMBER_ID)).toBe(true);
   });
 
-  it('lists only owned recent resources on GET /resources/recent', async () => {
+  it('lists owned and shared recent resources on GET /resources/recent', async () => {
     const res = await authedGet(MEMBER_ID, '/resources/recent');
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(OWNED_COUNT[MEMBER_ID]);
-    expect(res.body.every((r: { owner_id: string }) => r.owner_id === MEMBER_ID)).toBe(true);
+    expect(res.body).toHaveLength(ACCESSIBLE_COUNT[MEMBER_ID]);
     expect(res.body[0].id).toBe('30');
+    expect(res.body.some((r: { id: string }) => r.id === '1')).toBe(true);
   });
 
-  it('scopes query filters to owned resources on GET /resources', async () => {
+  it('paginates scoped results on GET /resources', async () => {
+    const page1 = await authedGet(MEMBER_ID, '/resources').query({ limit: 4, skip: 0 });
+    const page2 = await authedGet(MEMBER_ID, '/resources').query({ limit: 4, skip: 4 });
+
+    expect(page1.status).toBe(200);
+    expect(page2.status).toBe(200);
+    expect(page1.body).toHaveLength(4);
+    expect(page2.body).toHaveLength(4);
+
+    const ids = [...page1.body, ...page2.body].map((r: { id: string }) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('scopes query filters to accessible resources on GET /resources', async () => {
     const where = JSON.stringify({ type: 'doc' });
     const adminRes = await authedGet(ADMIN_ID, '/resources').query({ where });
     const memberRes = await authedGet(MEMBER_ID, '/resources').query({ where });
@@ -74,7 +97,8 @@ describe('access control — member scoped lists', () => {
     expect(adminRes.status).toBe(200);
     expect(memberRes.status).toBe(200);
     expect(adminRes.body.length).toBeGreaterThan(memberRes.body.length);
-    expect(memberRes.body.every((r: { owner_id: string }) => r.owner_id === MEMBER_ID)).toBe(true);
+    expect(memberRes.body.every((r: { type: string }) => r.type === 'doc')).toBe(true);
+    expect(memberRes.body.some((r: { id: string }) => r.id === '1')).toBe(true);
   });
 });
 

@@ -21,15 +21,27 @@ export class ResourcesRepository {
 
   // SHARED PATH — used by multiple endpoints. Changing this affects all callers.
   //
-  // There is NO access control here: every caller sees every resource it asks
-  // for, regardless of who is making the request. The auth stub populates
-  // req.userId but it never reaches this function.
+  // Access scoping is applied via `where.accessScopeUserId` (owned + shared) or
+  // `where.ownerId` (owner-only). Callers that need user-scoped visibility must
+  // pass the appropriate where clause from the service layer.
   async findResources(params: FindResourcesParams = {}): Promise<ResourceRow[]> {
     const sqlParams: unknown[] = [];
     const conditions: string[] = [];
 
     const { where, limit, skip, order } = params;
-    if (where?.ownerId !== undefined) {
+    if (where?.accessScopeUserId !== undefined) {
+      sqlParams.push(where.accessScopeUserId);
+      const userParam = `$${sqlParams.length}`;
+      conditions.push(`(
+        owner_id = ${userParam}
+        OR EXISTS (
+          SELECT 1
+          FROM resource_shares rs
+          WHERE rs.resource_id = resources.id
+            AND rs.user_id = ${userParam}
+        )
+      )`);
+    } else if (where?.ownerId !== undefined) {
       sqlParams.push(where.ownerId);
       conditions.push(`owner_id = $${sqlParams.length}`);
     }
