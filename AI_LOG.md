@@ -2,7 +2,7 @@
 
 ## Tools used
 
-- **Cursor Agent** — project onboarding; Biome setup; domain/layer restructure; class + singleton wiring; query validation scaffold.
+- **Cursor Agent** — project onboarding; Biome setup; domain/layer restructure; class + singleton wiring; query validation and repository wiring for Task 1.
 
 ## Representative prompts
 
@@ -13,7 +13,10 @@
 - "Reorganize by domain (screaming architecture); users in its own domain; separate interfaces."
 - "Keep `findResources` naming; use `{domain}.repository.ts` convention."
 - "Create classes with singleton DI; move route registration to each domain; don't export controller singletons."
-- "Stick with pg; add general FindQuery (where as JSON, limit, orderBy) with Joi validation at controller; service receives but does not use yet."
+- "Stick with pg; add general FindQuery (where as JSON, limit, order) with Joi validation at controller; wire through service to repository."
+- "Create a common reusable feature for query→params mapping; avoid default order on limit/skip."
+- "Use `order` at controller level (`{ field, direction }`); shared order validation — only provide where schema per endpoint."
+- "At service layer call it `filter` (`ResourcesFilter`); keep `parsed.value` at controller."
 
 ## Where I accepted / rejected / corrected AI output
 
@@ -30,9 +33,15 @@
 - **Rejected:** Drizzle/TypeORM adoption — stayed on `pg` per challenge scope and SQL focus.
 - **Rejected:** First manual parameterized query pass (custom parsers + repository defaults) — too complex; reverted.
 - **Rejected:** Over-abstracted `FindResourcesQuery` / service preset split — reverted in favor of simpler incremental step.
-- **Accepted:** Shared `FindQuery<TWhere>` (`where` JSON + `limit` + `orderBy`); Joi `where` schema per endpoint (`resourcesWhereSchema`); `parseFindQueryFromRequest()` in controller; service accepts optional query without wiring repository yet.
+- **Accepted:** Shared `FindQuery<TWhere>` (`where` JSON + `limit` + `skip` + `order` JSON); Joi `where` schema per endpoint (`resourcesWhereSchema`); shared `order` schema (`{ field, direction }`); `parseFindQueryFromRequest()` in controller.
+- **Accepted:** Shared `FindParams` + `buildFindParams()` for query→repository mapping; `buildFindResourcesParams()` in resources domain.
+- **Accepted:** `ResourcesFilter` alias at service layer; controller passes `parsed.value` into `findResources(filter)`.
+- **Rejected:** `orderBy` string param and `orderBy`→`order`→`orderBy` conversions — single `order` object end-to-end.
+- **Rejected:** Per-domain `orderSchema` — order shape is shared; only `where` varies per endpoint.
+- **Rejected:** Implicit default `ORDER BY id ASC` when `limit`/`skip` present — order only when explicitly requested (except internal presets like `/resources/recent`).
 
 ## How I verified AI-generated code
 
 - Cross-checked onboarding summary against `src/*.ts`, migrations, seed, and tests.
-- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (3 tests on `GET /resources` validation).
+- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (4 tests on `GET /resources`: list, filter+limit+order, skip pagination, 400 on bad params).
+- Manually reviewed parameterized SQL in `resources.repository.ts` (allowlisted order fields, no string interpolation of user input).

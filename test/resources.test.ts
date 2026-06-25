@@ -26,24 +26,38 @@ describe('GET /resources', () => {
     expect(res.body).toHaveLength(30);
   });
 
-  it('accepts validated where, limit, and orderBy query params', async () => {
+  it('filters by where, paginates, and orders validated query params', async () => {
     const res = await request(app)
       .get('/resources')
       .query({
         where: JSON.stringify({ type: 'doc', status: 'draft' }),
         limit: 5,
-        orderBy: 'asc',
+        order: JSON.stringify({ field: 'id', direction: 'asc' }),
       });
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(30);
+    expect(res.body).toHaveLength(5);
+    expect(res.body.every((r: { type: string; status: string }) => r.type === 'doc')).toBe(true);
+    expect(res.body.every((r: { status: string }) => r.status === 'draft')).toBe(true);
+  });
+
+  it('paginates with skip', async () => {
+    const order = JSON.stringify({ field: 'id', direction: 'asc' });
+    const firstPage = await request(app).get('/resources').query({ limit: 5, order });
+    const secondPage = await request(app)
+      .get('/resources')
+      .query({ limit: 5, skip: 5, order });
+
+    expect(firstPage.status).toBe(200);
+    expect(secondPage.status).toBe(200);
+    expect(firstPage.body[0].id).not.toBe(secondPage.body[0].id);
   });
 
   it('returns 400 for invalid query parameters', async () => {
     const res = await request(app).get('/resources').query({
       where: 'not-json',
       limit: 0,
-      orderBy: 'sideways',
+      order: 'not-json',
     });
 
     expect(res.status).toBe(400);

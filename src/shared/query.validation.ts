@@ -1,9 +1,14 @@
 import type { Request } from 'express';
 import Joi from 'joi';
-import type { FindQuery, OrderDirection } from './query.types';
+import type { FindOrder, FindQuery } from './query.types';
 
 const LIMIT_SCHEMA = Joi.number().integer().min(1).max(100);
-const ORDER_BY_SCHEMA = Joi.string().valid('asc', 'desc');
+const SKIP_SCHEMA = Joi.number().integer().min(0);
+
+const ORDER_SCHEMA = Joi.object<FindOrder>({
+  field: Joi.string().required(),
+  direction: Joi.string().valid('asc', 'desc').required(),
+});
 
 export type ParseFindQueryResult<TWhere> =
   | { ok: true; value: FindQuery<TWhere> }
@@ -26,12 +31,30 @@ export function parseFindQueryFromRequest<TWhere>(
     }
   }
 
-  if (query.orderBy !== undefined) {
-    const { error, value: orderBy } = ORDER_BY_SCHEMA.validate(query.orderBy, joiOptions);
+  if (query.skip !== undefined) {
+    const { error, value: skip } = SKIP_SCHEMA.validate(query.skip, joiOptions);
     if (error) {
       errors.push(...error.details.map((detail) => detail.message));
     } else {
-      value.orderBy = orderBy as OrderDirection;
+      value.skip = skip;
+    }
+  }
+
+  if (query.order !== undefined) {
+    if (typeof query.order !== 'string') {
+      errors.push('order must be a JSON string');
+    } else {
+      try {
+        const parsedOrder: unknown = JSON.parse(query.order);
+        const { error, value: order } = ORDER_SCHEMA.validate(parsedOrder, joiOptions);
+        if (error) {
+          errors.push(...error.details.map((detail) => detail.message));
+        } else {
+          value.order = order;
+        }
+      } catch {
+        errors.push('order must be valid JSON');
+      }
     }
   }
 
