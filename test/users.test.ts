@@ -1,11 +1,27 @@
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { migrate } from '../scripts/migrate';
 import { seed } from '../scripts/seed';
 import { createApp } from '../src/app';
 import { pool } from '../src/db';
+import type { ResourcesService } from '../src/resources/resources.service';
+import type { UsersRepository } from '../src/users/users.repository';
+import { ForbiddenError, UsersService } from '../src/users/users.service';
+import type { UserRole } from '../src/users/users.types';
 
 const app = createApp();
+
+function createUsersService(role: UserRole | undefined): UsersService {
+  const usersRepository = {
+    findRoleById: vi.fn().mockResolvedValue(role),
+  } as unknown as UsersRepository;
+
+  const resourcesService = {
+    findResourcesByOwner: vi.fn(),
+  } as unknown as ResourcesService;
+
+  return UsersService.getInstance(resourcesService, usersRepository);
+}
 
 beforeAll(async () => {
   await migrate();
@@ -14,6 +30,32 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await pool.end();
+});
+
+describe('UsersService.authorizeOwner', () => {
+  beforeEach(() => {
+    (UsersService as unknown as { instance: UsersService | undefined }).instance = undefined;
+  });
+
+  it('allows admin regardless of ownerId', async () => {
+    const service = createUsersService('admin');
+    await expect(service.authorizeOwner('1', '99')).resolves.toBeUndefined();
+  });
+
+  it('allows member when userId matches ownerId', async () => {
+    const service = createUsersService('member');
+    await expect(service.authorizeOwner('2', '2')).resolves.toBeUndefined();
+  });
+
+  it('forbids member when userId differs from ownerId', async () => {
+    const service = createUsersService('member');
+    await expect(service.authorizeOwner('2', '3')).rejects.toThrow(ForbiddenError);
+  });
+
+  it('forbids when user does not exist', async () => {
+    const service = createUsersService(undefined);
+    await expect(service.authorizeOwner('2', '2')).rejects.toThrow(ForbiddenError);
+  });
 });
 
 describe('GET /users/:userId/resources', () => {
@@ -31,12 +73,13 @@ describe('GET /users/:userId/resources', () => {
     expect(res.body.error).toBe('Unauthorized');
   });
 
-  it('accepts x-user-id values outside Number.MAX_SAFE_INTEGER', async () => {
+  it('returns 403 when x-user-id is valid but user does not exist', async () => {
     const res = await request(app)
       .get('/users/1/resources')
       .set('x-user-id', '9007199254740992');
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('Forbidden');
   });
 
   it('returns resources owned by the user', async () => {
@@ -46,5 +89,26 @@ describe('GET /users/:userId/resources', () => {
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeGreaterThan(0);
     expect(res.body.every((r: { owner_id: string }) => r.owner_id === '1')).toBe(true);
+  });
+
+  it('allows admin to access another user resources', async () => {
+    const res = await request(app).get('/users/2/resources').set('x-user-id', '1');
+
+    expect(res.status).toBe(200);
+    expect(res.body.every((r: { owner_id: string }) => r.owner_id === '2')).toBe(true);
+  });
+
+  it('allows member to access their own resources', async () => {
+    const res = await request(app).get('/users/2/resources').set('x-user-id', '2');
+
+    expect(res.status).toBe(200);
+    expect(res.body.every((r: { owner_id: string }) => r.owner_id === '2')).toBe(true);
+  });
+
+  it('returns 403 when member accesses another user resources', async () => {
+    const res = await request(app).get('/users/3/resources').set('x-user-id', '2');
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('Forbidden');
   });
 });

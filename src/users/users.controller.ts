@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { parseUserId } from '../middleware/auth';
-import { UsersService } from './users.service';
+import { ForbiddenError, UsersService } from './users.service';
 
 export class UsersController {
   private static instance: UsersController | undefined;
@@ -23,9 +23,16 @@ export class UsersController {
         return;
       }
 
+      const { userId } = req as Request & { userId: string };
+      await this.service.authorizeOwner(userId, ownerId);
       const resources = await this.service.findUserResources(ownerId);
       res.json(resources);
     } catch (err) {
+      // TODO: Add a global error handler to handle all errors and return a consistent response.
+      if (err instanceof ForbiddenError) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
       next(err);
     }
   };
