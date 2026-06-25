@@ -7,7 +7,7 @@ import { pool } from '../src/db';
 import type { ResourcesService } from '../src/resources/resources.service';
 import type { UsersRepository } from '../src/users/users.repository';
 import { ForbiddenError, UsersService } from '../src/users/users.service';
-import type { UserRole } from '../src/users/users.types';
+import { UserRole } from '../src/users/users.types';
 
 const app = createApp();
 
@@ -38,17 +38,17 @@ describe('UsersService.authorizeOwner', () => {
   });
 
   it('allows admin regardless of ownerId', async () => {
-    const service = createUsersService('admin');
+    const service = createUsersService(UserRole.Admin);
     await expect(service.authorizeOwner('1', '99')).resolves.toBeUndefined();
   });
 
   it('allows member when userId matches ownerId', async () => {
-    const service = createUsersService('member');
+    const service = createUsersService(UserRole.Member);
     await expect(service.authorizeOwner('2', '2')).resolves.toBeUndefined();
   });
 
   it('forbids member when userId differs from ownerId', async () => {
-    const service = createUsersService('member');
+    const service = createUsersService(UserRole.Member);
     await expect(service.authorizeOwner('2', '3')).rejects.toThrow(ForbiddenError);
   });
 

@@ -21,6 +21,7 @@
 - "Require `x-user-id` on user routes only for Task 2 scope; document assumption that other endpoints stay open for now."
 - "Support postgres bigint for user ids; reject 401 only in requireAuth; set req.userId if and only if header format is valid."
 - "Add authorizeOwner at users service layer; admin bypasses, member must match ownerId; 403 otherwise."
+- "Use UserRole enum for member/admin instead of string literals in authorizeOwner."
 
 ## Assumptions
 
@@ -58,6 +59,7 @@
 - **Rejected:** Separate `users.authorization.ts` module — kept `authorizeOwner` on `UsersService`.
 - **Rejected:** `{ ok: true | false }` return from `authorizeOwner` alongside `ForbiddenError` catch — service throws, controller catches once.
 - **Accepted:** Unit and integration tests for users domain in single `test/users.test.ts`.
+- **Accepted:** `UserRole` enum (`Member`, `Admin`) in `users.types.ts` — string values match postgres `role` column; used in `authorizeOwner` and tests.
 
 ## How I verified AI-generated code
 

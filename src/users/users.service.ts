@@ -1,6 +1,7 @@
 import { ResourcesService } from '../resources/resources.service';
 import type { ResourceRow } from '../resources/resources.types';
 import { UsersRepository } from './users.repository';
+import { UserRole } from './users.types';
 
 export class ForbiddenError extends Error {
   constructor() {
@@ -35,11 +36,11 @@ export class UsersService {
       throw new ForbiddenError();
     }
 
-    if (role === 'admin') {
+    if (role === UserRole.Admin) {
       return;
     }
 
-    if (role === 'member' && userId === ownerId) {
+    if (role === UserRole.Member && userId === ownerId) {
       return;
     }
 
