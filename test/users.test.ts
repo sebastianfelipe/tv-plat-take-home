@@ -61,6 +61,11 @@ describe('UsersService.authorizeOwner', () => {
 });
 
 describe('GET /users/:userId/resources', () => {
+  beforeAll(() => {
+    (UsersService as unknown as { instance: UsersService | undefined }).instance = undefined;
+    UsersService.getInstance();
+  });
+
   it('returns 401 without x-user-id header', async () => {
     const res = await request(app).get('/users/1/resources');
 
@@ -75,13 +80,13 @@ describe('GET /users/:userId/resources', () => {
     expect(res.body.error).toBe('Unauthorized');
   });
 
-  it('returns 403 when x-user-id is valid but user does not exist', async () => {
+  it('returns 401 when x-user-id is valid but user does not exist', async () => {
     const res = await request(app)
       .get('/users/1/resources')
       .set('x-user-id', '9007199254740992');
 
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('Forbidden');
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Unauthorized');
   });
 
   it('returns resources owned by the user', async () => {

@@ -26,10 +26,11 @@
 - "Add `buildRestrictedWhere(userId)` on resources service — admin sees all, member restricted to `ownerId`."
 - "Wire `buildRestrictedWhere` at resources controller for `GET /resources`; pass `restrictedWhere` as second arg to `findResources` and merge in service."
 - "Apply same `buildRestrictedWhere` policy to `GET /resources/recent`; `findRecentResources` accepts only `restrictedWhere`."
+- "Validate user existence in `requireAuth` via `UsersService.findById`; reject unknown ids with 401."
 
 ## Assumptions
 
-- **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. **TODO:** extend member access to shared resources via `resource_shares`.
+- **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. `requireAuth` then confirms the id exists in `users` via `UsersService.findById()` (401 if missing or unknown). **TODO:** extend member access to shared resources via `resource_shares`.
 - **User ids as strings:** `users.id` is postgres `bigint`. JavaScript `number` is not safe for the full 64-bit range, so `req.userId`, path params, and `ownerId` filters use decimal strings end-to-end to match pg's default bigint wire format.
 - **Owner authorization:** `authorizeOwner(userId, ownerId)` runs in the controller before `findUserResources(ownerId)`. Admins may read any user's resources; members may only read their own (`userId === ownerId`).
 
@@ -58,7 +59,8 @@
 - **Rejected:** Global 401 on all endpoints via `authStub` — scoped `requireAuth` to protected routes only; `authStub` attaches valid `req.userId` without rejecting.
 - **Rejected:** Parsing user ids with `Number()` — loses precision above `Number.MAX_SAFE_INTEGER`; use shared `parseUserId()` with `BigInt` validation instead.
 - **Rejected:** Returning 401 from `authStub` for malformed headers — `authStub` is opt-in attachment only; `requireAuth` on protected routes handles rejection.
-- **Accepted:** Split `authStub` (attach valid `req.userId`) + `requireAuth` (401 when unset); `requireAuth` on users and resources routes; path param validated with same `parseUserId()` helper.
+- **Accepted:** Split `authStub` (attach valid `req.userId`) + async `requireAuth` (401 when unset or user not found via `UsersService.findById`); `requireAuth` on users and resources routes; path param validated with same `parseUserId()` helper.
+- **Accepted:** Unknown-but-well-formed `x-user-id` returns 401 from `requireAuth` (not 403 from `authorizeOwner`) — identity does not exist.
 - **Accepted:** `UsersService.authorizeOwner(userId, ownerId)` called from controller before `findUserResources`; `ForbiddenError` → 403 in controller.
 - **Accepted:** `User` interface (`id`, `name`, `role`) in `users.types.ts`; `UsersRepository.findById()` returns full user row; `UsersService.findById()` as the service-layer lookup used by `authorizeOwner` and `ResourcesService.buildRestrictedWhere`.
 - **Accepted:** `ResourcesService` injects `UsersService` (optional in `getInstance` for tests); `UsersService.getInstance()` wires itself back into `ResourcesService` after bootstrap (resources routes register first in `app.ts`).
@@ -76,9 +78,10 @@
 ## How I verified AI-generated code
 
 - Cross-checked onboarding summary against `src/*.ts`, migrations, seed, and tests.
-- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (10 tests on resources: 7 on `GET /resources`, 3 on `GET /resources/recent`; 11 on users: 4 unit `authorizeOwner`, 7 integration auth/authorization).
+- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (22 total: 11 on resources, 11 on users including 4 unit `authorizeOwner` and 7 integration auth/authorization).
 - Verified member (user 2) on `GET /resources` sees only 8 owned resources; admin (user 1) still sees all 30.
 - Verified member on `GET /resources/recent` sees 8 owned resources (most recent id `30`); admin sees global top 10.
 - Manually reviewed parameterized SQL in `resources.repository.ts` (typed order fields after controller validation, no string interpolation of user input).
 - Verified `parseUserId()` accepts ids above `Number.MAX_SAFE_INTEGER` and rejects non-numeric headers via `requireAuth`.
+- Verified unknown user id (`9007199254740992`) returns 401 on protected routes.
 - Verified admin (user 1) can list another user's resources; member (user 2) gets 403 on user 3's resources.

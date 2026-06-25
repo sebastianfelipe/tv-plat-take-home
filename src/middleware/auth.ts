@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { UsersService } from '../users/users.service';
 import './express.types';
 
 // users.id is postgres bigint. JavaScript number cannot represent the full 64-bit
@@ -25,8 +26,7 @@ export function parseUserId(value: string): string | undefined {
 // positive bigint id. Otherwise the request continues unsigned — rejection is
 // deferred to requireAuth on protected routes.
 //
-// NOTE: the data layer currently IGNORES req.userId. Wiring it into access
-// control is intentionally left undone (see CHALLENGE.md, task 2).
+// NOTE: protected routes use requireAuth to reject missing, malformed, or unknown ids.
 export function authStub(req: Request, _res: Response, next: NextFunction) {
   const xUserId = req.header('x-user-id');
   if (xUserId !== undefined) {
@@ -39,12 +39,22 @@ export function authStub(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  // Missing or malformed x-user-id leaves req.userId unset — reject here.
-  if (req.userId === undefined) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    // Missing or malformed x-user-id leaves req.userId unset — reject here.
+    if (req.userId === undefined) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
-  next();
+    const user = await UsersService.getInstance().findById(req.userId);
+    if (user === undefined) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
 }

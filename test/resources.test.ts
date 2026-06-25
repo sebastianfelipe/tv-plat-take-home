@@ -27,6 +27,13 @@ describe('GET /resources', () => {
     expect(res.body.error).toBe('Unauthorized');
   });
 
+  it('returns 401 when x-user-id is valid but user does not exist', async () => {
+    const res = await request(app).get('/resources').set('x-user-id', '9007199254740992');
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Unauthorized');
+  });
+
   it('returns the full seeded set of resources for admin', async () => {
     const res = await authedGet('/resources');
 
