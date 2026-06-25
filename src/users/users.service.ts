@@ -13,7 +13,7 @@ export class UsersService {
     return UsersService.instance;
   }
 
-  findUserResources(ownerId: number): Promise<ResourceRow[]> {
+  findUserResources(ownerId: string): Promise<ResourceRow[]> {
     return this.resourcesService.findResourcesByOwner(ownerId);
   }
 }

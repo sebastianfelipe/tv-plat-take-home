@@ -13,7 +13,7 @@ export interface FindResourcesOrder {
 }
 
 export interface FindResourcesWhere extends ResourcesWhere {
-  ownerId?: number;
+  ownerId?: string;
 }
 
 export interface FindResourcesParams {

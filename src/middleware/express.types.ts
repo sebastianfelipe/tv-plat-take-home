@@ -1,7 +1,8 @@
 declare global {
   namespace Express {
     interface Request {
-      userId?: number;
+      // Decimal string — matches postgres bigint via pg driver (see auth.ts).
+      userId?: string;
     }
   }
 }

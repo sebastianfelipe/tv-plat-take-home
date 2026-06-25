@@ -28,7 +28,7 @@ export class ResourcesService {
     return this.repository.findResources(params);
   }
 
-  findResourcesByOwner(ownerId: number): Promise<ResourceRow[]> {
+  findResourcesByOwner(ownerId: string): Promise<ResourceRow[]> {
     return this.repository.findResources({ where: { ownerId } });
   }
 }
