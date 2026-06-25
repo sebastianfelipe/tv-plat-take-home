@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { parseFindQueryFromRequest } from '../shared/query.validation';
 import { ResourcesService } from './resources.service';
-import { resourcesWhereSchema } from './resources.validation';
+import { resourcesOrderSchema, resourcesWhereSchema } from './resources.validation';
 
 export class ResourcesController {
   private static instance: ResourcesController | undefined;
@@ -24,6 +24,20 @@ export class ResourcesController {
       if (!parsed.ok) {
         res.status(400).json({ error: 'Invalid query parameters', details: parsed.errors });
         return;
+      }
+
+      if (parsed.value.order !== undefined) {
+        const { error } = resourcesOrderSchema.validate(parsed.value.order, {
+          convert: true,
+          abortEarly: false,
+        });
+        if (error) {
+          res.status(400).json({
+            error: 'Invalid query parameters',
+            details: error.details.map((detail) => detail.message),
+          });
+          return;
+        }
       }
 
       const resources = await this.service.findResources(parsed.value);

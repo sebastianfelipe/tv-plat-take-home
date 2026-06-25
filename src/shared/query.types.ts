@@ -26,20 +26,22 @@ export function buildFindParams<TWhere>(query?: FindQuery<TWhere>): FindParams<T
 
   const params: FindParams<TWhere> = {};
 
-  if (query.where !== undefined) {
-    params.where = query.where;
+  const { where, limit, skip, order } = query;
+
+  if (where !== undefined) {
+    params.where = where;
   }
 
-  if (query.limit !== undefined) {
-    params.limit = query.limit;
+  if (limit !== undefined) {
+    params.limit = limit;
   }
 
   if (query.skip !== undefined) {
-    params.skip = query.skip;
+    params.skip = skip;
   }
 
   if (query.order !== undefined) {
-    params.order = query.order;
+    params.order = order;
   }
 
   return params;

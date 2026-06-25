@@ -28,16 +28,17 @@ export class ResourcesRepository {
     const sqlParams: unknown[] = [];
     const conditions: string[] = [];
 
-    if (params.where?.ownerId !== undefined) {
-      sqlParams.push(params.where.ownerId);
+    const { where, limit, skip, order } = params;
+    if (where?.ownerId !== undefined) {
+      sqlParams.push(where.ownerId);
       conditions.push(`owner_id = $${sqlParams.length}`);
     }
-    if (params.where?.type !== undefined) {
-      sqlParams.push(params.where.type);
+    if (where?.type !== undefined) {
+      sqlParams.push(where.type);
       conditions.push(`type = $${sqlParams.length}`);
     }
-    if (params.where?.status !== undefined) {
-      sqlParams.push(params.where.status);
+    if (where?.status !== undefined) {
+      sqlParams.push(where.status);
       conditions.push(`status = $${sqlParams.length}`);
     }
 
@@ -50,19 +51,19 @@ export class ResourcesRepository {
       sql += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    if (params.order) {
-      const field = ORDER_FIELDS[params.order.field as FindResourcesOrderField];
-      const direction = params.order.direction === 'asc' ? 'ASC' : 'DESC';
+    if (order) {
+      const field = ORDER_FIELDS[order.field];
+      const direction = order.direction === 'asc' ? 'ASC' : 'DESC';
       sql += ` ORDER BY ${field} ${direction}`;
     }
 
-    if (params.limit !== undefined) {
-      sqlParams.push(params.limit);
+    if (limit !== undefined) {
+      sqlParams.push(limit);
       sql += ` LIMIT $${sqlParams.length}`;
     }
 
-    if (params.skip !== undefined) {
-      sqlParams.push(params.skip);
+    if (skip !== undefined) {
+      sqlParams.push(skip);
       sql += ` OFFSET $${sqlParams.length}`;
     }
 

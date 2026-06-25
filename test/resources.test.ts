@@ -53,6 +53,16 @@ describe('GET /resources', () => {
     expect(firstPage.body[0].id).not.toBe(secondPage.body[0].id);
   });
 
+  it('returns 400 for an unsupported order field', async () => {
+    const res = await request(app)
+      .get('/resources')
+      .query({ order: JSON.stringify({ field: 'title', direction: 'asc' }) });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid query parameters');
+    expect(res.body.details.length).toBeGreaterThan(0);
+  });
+
   it('returns 400 for invalid query parameters', async () => {
     const res = await request(app).get('/resources').query({
       where: 'not-json',
