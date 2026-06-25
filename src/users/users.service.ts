@@ -1,6 +1,6 @@
 import { ResourcesService } from '../resources/resources.service';
 import type { ResourceRow } from '../resources/resources.types';
-import { ForbiddenError } from '../shared/errors';
+import { ForbiddenError, NotFoundError } from '../shared/errors';
 import { UsersRepository } from './users.repository';
 import type { User } from './users.types';
 import { UserRole } from './users.types';
@@ -47,7 +47,16 @@ export class UsersService {
     throw new ForbiddenError();
   }
 
-  findUserResources(ownerId: string): Promise<ResourceRow[]> {
+  async findUserResources(ownerId: string): Promise<ResourceRow[]> {
+    const owner = await this.findById(ownerId);
+
+    // Path owner must exist. Admins reach this after authorizeOwner with any id — a
+    // missing target user is not found (404), not forbidden. Members only reach this
+    // when ownerId matches their own id, so a missing owner implies the same 404.
+    if (owner === undefined) {
+      throw new NotFoundError();
+    }
+
     return this.resourcesService.findResourcesByOwner(ownerId);
   }
 }

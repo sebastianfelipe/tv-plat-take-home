@@ -29,12 +29,13 @@
 - "Validate user existence in `requireAuth` via `UsersService.findById`; reject unknown ids with 401."
 - "Remove `type` / `status` enum restrictions on resource filters — migration uses unconstrained `text` columns."
 - "Add global error handler and `asyncHandler` wrapper; move `ForbiddenError` to shared errors module."
+- "Validate path owner exists in `findUserResources(ownerId)` — throw 404 when missing (not in `authorizeOwner`)."
 
 ## Assumptions
 
 - **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. `requireAuth` then confirms the id exists in `users` via `UsersService.findById()` (401 if missing or unknown). **TODO:** extend member access to shared resources via `resource_shares`.
 - **User ids as strings:** `users.id` is postgres `bigint`. JavaScript `number` is not safe for the full 64-bit range, so `req.userId`, path params, and `ownerId` filters use decimal strings end-to-end to match pg's default bigint wire format.
-- **Owner authorization:** `authorizeOwner(userId, ownerId)` runs in the controller before `findUserResources(ownerId)`. Admins may read any user's resources; members may only read their own (`userId === ownerId`).
+- **Owner authorization:** `authorizeOwner(userId, ownerId)` runs in the controller before `findUserResources(ownerId)`. Admins may read any user's resources; members may only read their own (`userId === ownerId`). `findUserResources` then confirms the path owner exists (404 if not).
 
 ## Where I accepted / rejected / corrected AI output
 
@@ -77,6 +78,8 @@
 - **Accepted:** Global `errorHandler` in `middleware/error-handler.ts` registered last in `app.ts`; `HttpError` base + `ForbiddenError` in `shared/errors.ts`; unknown errors → 500.
 - **Accepted:** `asyncHandler` in `middleware/async-handler.ts` wraps async route handlers in domain route modules — controllers drop try/catch/`next(err)` boilerplate.
 - **Rejected:** Per-controller `ForbiddenError` catch blocks — centralized in error handler instead.
+- **Accepted:** `findUserResources(ownerId)` validates the path owner via `findById` after `authorizeOwner`; missing owner → `NotFoundError` (404). Admins otherwise pass authorization but get 404 for unknown target users; members only reach this when `ownerId` matches their id.
+- **Rejected:** Owner existence check in `authorizeOwner` — kept authorization (403) separate from resource lookup (404) in `findUserResources`.
 - **Accepted:** Unit and integration tests for users domain in single `test/users.test.ts`.
 - **Accepted:** `UserRole` enum (`Member`, `Admin`) in `users.types.ts` — string values match postgres `role` column; used in `authorizeOwner` and tests.
 - **Corrected:** Dropped hardcoded `type` / `status` unions and Joi `.valid()` allowlists — `resources.type` and `resources.status` are plain `text` in `0001_init.sql`; `ResourcesWhere` and `resourcesWhereSchema` accept any string. Order field allowlist (`id`, `created_at`) unchanged.
