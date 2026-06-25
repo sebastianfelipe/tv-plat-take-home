@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import { pool } from '../db';
-import type { UserRole } from './users.types';
+import type { User } from './users.types';
 
 export class UsersRepository {
   private static instance: UsersRepository | undefined;
@@ -14,12 +14,12 @@ export class UsersRepository {
     return UsersRepository.instance;
   }
 
-  async findRoleById(userId: string): Promise<UserRole | undefined> {
-    const result = await this.db.query<{ role: UserRole }>(
-      'SELECT role FROM users WHERE id = $1',
+  async findById(userId: string): Promise<User | undefined> {
+    const result = await this.db.query<User>(
+      'SELECT id, name, role FROM users WHERE id = $1',
       [userId],
     );
-    return result.rows[0]?.role;
+    return result.rows[0];
   }
 }
 

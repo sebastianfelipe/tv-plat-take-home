@@ -1,6 +1,8 @@
+import { ResourcesRepository } from '../resources/resources.repository';
 import { ResourcesService } from '../resources/resources.service';
 import type { ResourceRow } from '../resources/resources.types';
 import { UsersRepository } from './users.repository';
+import type { User } from './users.types';
 import { UserRole } from './users.types';
 
 export class ForbiddenError extends Error {
@@ -17,10 +19,7 @@ export class UsersService {
     private readonly usersRepository: UsersRepository,
   ) {}
 
-  static getInstance(
-    resourcesSvc?: ResourcesService,
-    usersRepo?: UsersRepository,
-  ): UsersService {
+  static getInstance(resourcesSvc?: ResourcesService, usersRepo?: UsersRepository): UsersService {
     if (!UsersService.instance) {
       UsersService.instance = new UsersService(
         resourcesSvc ?? ResourcesService.getInstance(),
@@ -30,17 +29,21 @@ export class UsersService {
     return UsersService.instance;
   }
 
+  findById(userId: string): Promise<User | undefined> {
+    return this.usersRepository.findById(userId);
+  }
+
   async authorizeOwner(userId: string, ownerId: string): Promise<void> {
-    const role = await this.usersRepository.findRoleById(userId);
-    if (role === undefined) {
+    const user = await this.findById(userId);
+    if (user === undefined) {
       throw new ForbiddenError();
     }
 
-    if (role === UserRole.Admin) {
+    if (user.role === UserRole.Admin) {
       return;
     }
 
-    if (role === UserRole.Member && userId === ownerId) {
+    if (user.role === UserRole.Member && userId === ownerId) {
       return;
     }
 
@@ -51,5 +54,3 @@ export class UsersService {
     return this.resourcesService.findResourcesByOwner(ownerId);
   }
 }
-
-export const usersService = UsersService.getInstance();

@@ -13,7 +13,9 @@ const app = createApp();
 
 function createUsersService(role: UserRole | undefined): UsersService {
   const usersRepository = {
-    findRoleById: vi.fn().mockResolvedValue(role),
+    findById: vi.fn().mockResolvedValue(
+      role === undefined ? undefined : { id: '1', name: 'Test', role },
+    ),
   } as unknown as UsersRepository;
 
   const resourcesService = {

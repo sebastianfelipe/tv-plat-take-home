@@ -7,6 +7,8 @@ import { pool } from '../src/db';
 
 const app = createApp();
 
+const authedGet = (path: string) => request(app).get(path).set('x-user-id', '1');
+
 beforeAll(async () => {
   // Boot against the docker Postgres: apply migrations, then reset + seed.
   await migrate();
@@ -18,8 +20,15 @@ afterAll(async () => {
 });
 
 describe('GET /resources', () => {
-  it('returns the full seeded set of resources', async () => {
+  it('returns 401 without x-user-id header', async () => {
     const res = await request(app).get('/resources');
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Unauthorized');
+  });
+
+  it('returns the full seeded set of resources', async () => {
+    const res = await authedGet('/resources');
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
@@ -27,8 +36,7 @@ describe('GET /resources', () => {
   });
 
   it('filters by where, paginates, and orders validated query params', async () => {
-    const res = await request(app)
-      .get('/resources')
+    const res = await authedGet('/resources')
       .query({
         where: JSON.stringify({ type: 'doc', status: 'draft' }),
         limit: 5,
@@ -43,9 +51,8 @@ describe('GET /resources', () => {
 
   it('paginates with skip', async () => {
     const order = JSON.stringify({ field: 'id', direction: 'asc' });
-    const firstPage = await request(app).get('/resources').query({ limit: 5, order });
-    const secondPage = await request(app)
-      .get('/resources')
+    const firstPage = await authedGet('/resources').query({ limit: 5, order });
+    const secondPage = await authedGet('/resources')
       .query({ limit: 5, skip: 5, order });
 
     expect(firstPage.status).toBe(200);
@@ -54,8 +61,7 @@ describe('GET /resources', () => {
   });
 
   it('returns 400 for an unsupported order field', async () => {
-    const res = await request(app)
-      .get('/resources')
+    const res = await authedGet('/resources')
       .query({ order: JSON.stringify({ field: 'title', direction: 'asc' }) });
 
     expect(res.status).toBe(400);
@@ -64,7 +70,7 @@ describe('GET /resources', () => {
   });
 
   it('returns 400 for invalid query parameters', async () => {
-    const res = await request(app).get('/resources').query({
+    const res = await authedGet('/resources').query({
       where: 'not-json',
       limit: 0,
       order: 'not-json',
