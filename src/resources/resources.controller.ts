@@ -1,23 +1,38 @@
 import type { NextFunction, Request, Response } from 'express';
-import * as resourcesService from './resources.service';
+import { ResourcesService } from './resources.service';
 
-export async function findResources(_req: Request, res: Response, next: NextFunction) {
-  try {
-    const resources = await resourcesService.findResources();
-    res.json(resources);
-  } catch (err) {
-    next(err);
-  }
-}
+export class ResourcesController {
+  private static instance: ResourcesController | undefined;
 
-export async function findRecentResources(_req: Request, res: Response, next: NextFunction) {
-  try {
-    const resources = await resourcesService.findResources({
-      limit: 10,
-      orderBy: 'created_at desc',
-    });
-    res.json(resources);
-  } catch (err) {
-    next(err);
+  private constructor(private readonly service: ResourcesService) {}
+
+  static getInstance(service?: ResourcesService): ResourcesController {
+    if (!ResourcesController.instance) {
+      ResourcesController.instance = new ResourcesController(
+        service ?? ResourcesService.getInstance(),
+      );
+    }
+    return ResourcesController.instance;
   }
+
+  findResources = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const resources = await this.service.findResources();
+      res.json(resources);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  findRecentResources = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const resources = await this.service.findResources({
+        limit: 10,
+        orderBy: 'created_at desc',
+      });
+      res.json(resources);
+    } catch (err) {
+      next(err);
+    }
+  };
 }
