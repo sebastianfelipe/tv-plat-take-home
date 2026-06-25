@@ -25,6 +25,9 @@ export class UsersService {
         resourcesSvc ?? ResourcesService.getInstance(),
         usersRepo ?? UsersRepository.getInstance(),
       );
+      if (resourcesSvc === undefined) {
+        ResourcesService.getInstance(undefined, UsersService.instance);
+      }
     }
     return UsersService.instance;
   }

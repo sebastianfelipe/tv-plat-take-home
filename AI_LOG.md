@@ -24,10 +24,11 @@
 - "Use UserRole enum for member/admin instead of string literals in authorizeOwner."
 - "Replace `findRoleById` with `UsersService.findById`; inject `UsersService` into `ResourcesService` for role-based resource filtering."
 - "Add `buildRestrictedWhere(userId)` on resources service — admin sees all, member restricted to `ownerId`."
+- "Wire `buildRestrictedWhere` at resources controller for `GET /resources`; pass `restrictedWhere` as second arg to `findResources` and merge in service."
 
 ## Assumptions
 
-- **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. **TODO:** wire `buildRestrictedWhere` into `findResources` / `findRecentResources` so members only see owned (and later shared) resources; extend to shared resources via `resource_shares`.
+- **Auth scope (Task 2):** `requireAuth` on `GET /users/:userId/resources`, `GET /resources`, and `GET /resources/recent`. The global `authStub` reads `x-user-id` but never rejects — it sets `req.userId` only when the header is a valid positive bigint string. **TODO:** wire `buildRestrictedWhere` into `findRecentResources`; extend member access to shared resources via `resource_shares`.
 - **User ids as strings:** `users.id` is postgres `bigint`. JavaScript `number` is not safe for the full 64-bit range, so `req.userId`, path params, and `ownerId` filters use decimal strings end-to-end to match pg's default bigint wire format.
 - **Owner authorization:** `authorizeOwner(userId, ownerId)` runs in the controller before `findUserResources(ownerId)`. Admins may read any user's resources; members may only read their own (`userId === ownerId`).
 
@@ -59,10 +60,12 @@
 - **Accepted:** Split `authStub` (attach valid `req.userId`) + `requireAuth` (401 when unset); `requireAuth` on users and resources routes; path param validated with same `parseUserId()` helper.
 - **Accepted:** `UsersService.authorizeOwner(userId, ownerId)` called from controller before `findUserResources`; `ForbiddenError` → 403 in controller.
 - **Accepted:** `User` interface (`id`, `name`, `role`) in `users.types.ts`; `UsersRepository.findById()` returns full user row; `UsersService.findById()` as the service-layer lookup used by `authorizeOwner` and `ResourcesService.buildRestrictedWhere`.
-- **Accepted:** `ResourcesService` injects `UsersService` (optional in `getInstance` for tests); lazy getter with deferred `require()` to break circular import with `UsersService` → `ResourcesService`.
+- **Accepted:** `ResourcesService` injects `UsersService` (optional in `getInstance` for tests); `UsersService.getInstance()` wires itself back into `ResourcesService` after bootstrap (resources routes register first in `app.ts`).
+- **Rejected:** Lazy `require()` for `UsersService` in `ResourcesService` — failed under Vitest; explicit singleton wiring instead.
 - **Rejected:** `ResourcesService` calling `UsersRepository` directly — role lookups go through `UsersService.findById`.
 - **Rejected:** Module-level `export const usersService` / `resourcesService` singletons — caused circular import at load time; controllers call `getInstance()` instead.
-- **Accepted:** `ResourcesService.buildRestrictedWhere(userId)` — admin → `{}` (no filter); member → `{ ownerId: userId }`. Not yet merged into `findResources` / `findRecentResources` (next step).
+- **Accepted:** `ResourcesService.buildRestrictedWhere(userId)` — admin → `{}` (no filter); member → `{ ownerId: userId }`.
+- **Accepted:** `GET /resources` controller calls `buildRestrictedWhere(userId)` then `findResources(filter, restrictedWhere)`; service merges `{ ...filter.where, ...restrictedWhere }` so access restrictions win on conflicts.
 - **Rejected:** Separate `users.authorization.ts` module — kept `authorizeOwner` on `UsersService`.
 - **Rejected:** `{ ok: true | false }` return from `authorizeOwner` alongside `ForbiddenError` catch — service throws, controller catches once.
 - **Accepted:** Unit and integration tests for users domain in single `test/users.test.ts`.
@@ -71,7 +74,8 @@
 ## How I verified AI-generated code
 
 - Cross-checked onboarding summary against `src/*.ts`, migrations, seed, and tests.
-- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (6 tests on `GET /resources` including 401 without header, 11 on users: 4 unit `authorizeOwner`, 7 integration auth/authorization).
+- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (7 tests on `GET /resources` including admin full list, member owner scoping, and 401 without header; 11 on users: 4 unit `authorizeOwner`, 7 integration auth/authorization).
+- Verified member (user 2) on `GET /resources` sees only 8 owned resources; admin (user 1) still sees all 30.
 - Manually reviewed parameterized SQL in `resources.repository.ts` (typed order fields after controller validation, no string interpolation of user input).
 - Verified `parseUserId()` accepts ids above `Number.MAX_SAFE_INTEGER` and rejects non-numeric headers via `requireAuth`.
 - Verified admin (user 1) can list another user's resources; member (user 2) gets 403 on user 3's resources.

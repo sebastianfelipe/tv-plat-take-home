@@ -23,10 +23,7 @@ export class ResourcesService {
 
   private get usersService(): UsersService {
     if (!this.usersServiceRef) {
-      // Deferred to avoid circular import at module load time.
-      const { UsersService: UsersServiceClass } =
-        require('../users/users.service') as typeof import('../users/users.service');
-      this.usersServiceRef = UsersServiceClass.getInstance();
+      throw new Error('UsersService is not wired into ResourcesService');
     }
     return this.usersServiceRef;
   }
@@ -55,8 +52,17 @@ export class ResourcesService {
     return { ownerId: userId };
   }
 
-  findResources(filter?: ResourcesFilter): Promise<ResourceRow[]> {
-    return this.repository.findResources(buildFindResourcesParams(filter));
+  findResources(
+    filter?: ResourcesFilter,
+    restrictedWhere?: FindResourcesWhere,
+  ): Promise<ResourceRow[]> {
+    const params = buildFindResourcesParams(filter);
+
+    if (restrictedWhere !== undefined) {
+      params.where = { ...params.where, ...restrictedWhere };
+    }
+
+    return this.repository.findResources(params);
   }
 
   findRecentResources(): Promise<ResourceRow[]> {

@@ -40,7 +40,10 @@ export class ResourcesController {
         }
       }
 
-      const resources = await this.service.findResources(parsed.value);
+      const filter = parsed.value;
+      const { userId } = req as Request & { userId: string };
+      const restrictedWhere = await this.service.buildRestrictedWhere(userId);
+      const resources = await this.service.findResources(filter, restrictedWhere);
       res.json(resources);
     } catch (err) {
       next(err);
