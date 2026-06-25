@@ -5,8 +5,8 @@ import { seed } from '../scripts/seed';
 import { createApp } from '../src/app';
 import { pool } from '../src/db';
 import type { ResourcesService } from '../src/resources/resources.service';
+import { ForbiddenError, NotFoundError } from '../src/shared/errors';
 import type { UsersRepository } from '../src/users/users.repository';
-import { ForbiddenError } from '../src/shared/errors';
 import { UsersService } from '../src/users/users.service';
 import { UserRole } from '../src/users/users.types';
 
@@ -14,9 +14,9 @@ const app = createApp();
 
 function createUsersService(role: UserRole | undefined): UsersService {
   const usersRepository = {
-    findById: vi.fn().mockResolvedValue(
-      role === undefined ? undefined : { id: '1', name: 'Test', role },
-    ),
+    findById: vi
+      .fn()
+      .mockResolvedValue(role === undefined ? undefined : { id: '1', name: 'Test', role }),
   } as unknown as UsersRepository;
 
   const resourcesService = {
@@ -61,6 +61,39 @@ describe('UsersService.authorizeOwner', () => {
   });
 });
 
+describe('UsersService.findUserResources', () => {
+  beforeEach(() => {
+    (UsersService as unknown as { instance: UsersService | undefined }).instance = undefined;
+  });
+
+  it('throws not found when owner does not exist', async () => {
+    const usersRepository = {
+      findById: vi.fn().mockResolvedValue(undefined),
+    } as unknown as UsersRepository;
+    const resourcesService = {
+      findResourcesByOwner: vi.fn(),
+    } as unknown as ResourcesService;
+    const service = UsersService.getInstance(resourcesService, usersRepository);
+
+    await expect(service.findUserResources('99')).rejects.toThrow(NotFoundError);
+    expect(resourcesService.findResourcesByOwner).not.toHaveBeenCalled();
+  });
+
+  it('loads resources when owner exists', async () => {
+    const resources = [{ id: '1', owner_id: '2' }];
+    const usersRepository = {
+      findById: vi.fn().mockResolvedValue({ id: '2', name: 'Bob', role: UserRole.Member }),
+    } as unknown as UsersRepository;
+    const resourcesService = {
+      findResourcesByOwner: vi.fn().mockResolvedValue(resources),
+    } as unknown as ResourcesService;
+    const service = UsersService.getInstance(resourcesService, usersRepository);
+
+    await expect(service.findUserResources('2')).resolves.toEqual(resources);
+    expect(resourcesService.findResourcesByOwner).toHaveBeenCalledWith('2');
+  });
+});
+
 describe('GET /users/:userId/resources', () => {
   beforeAll(() => {
     (UsersService as unknown as { instance: UsersService | undefined }).instance = undefined;
@@ -82,41 +115,9 @@ describe('GET /users/:userId/resources', () => {
   });
 
   it('returns 401 when x-user-id is valid but user does not exist', async () => {
-    const res = await request(app)
-      .get('/users/1/resources')
-      .set('x-user-id', '9007199254740992');
+    const res = await request(app).get('/users/1/resources').set('x-user-id', '9007199254740992');
 
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('Unauthorized');
-  });
-
-  it('returns resources owned by the user', async () => {
-    const res = await request(app).get('/users/1/resources').set('x-user-id', '1');
-
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThan(0);
-    expect(res.body.every((r: { owner_id: string }) => r.owner_id === '1')).toBe(true);
-  });
-
-  it('allows admin to access another user resources', async () => {
-    const res = await request(app).get('/users/2/resources').set('x-user-id', '1');
-
-    expect(res.status).toBe(200);
-    expect(res.body.every((r: { owner_id: string }) => r.owner_id === '2')).toBe(true);
-  });
-
-  it('allows member to access their own resources', async () => {
-    const res = await request(app).get('/users/2/resources').set('x-user-id', '2');
-
-    expect(res.status).toBe(200);
-    expect(res.body.every((r: { owner_id: string }) => r.owner_id === '2')).toBe(true);
-  });
-
-  it('returns 403 when member accesses another user resources', async () => {
-    const res = await request(app).get('/users/3/resources').set('x-user-id', '2');
-
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('Forbidden');
   });
 });

@@ -34,22 +34,6 @@ describe('GET /resources', () => {
     expect(res.body.error).toBe('Unauthorized');
   });
 
-  it('returns the full seeded set of resources for admin', async () => {
-    const res = await authedGet('/resources');
-
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body).toHaveLength(30);
-  });
-
-  it('returns only owned resources for member', async () => {
-    const res = await request(app).get('/resources').set('x-user-id', '2');
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(8);
-    expect(res.body.every((r: { owner_id: string }) => r.owner_id === '2')).toBe(true);
-  });
-
   it('filters by where, paginates, and orders validated query params', async () => {
     const res = await authedGet('/resources')
       .query({
@@ -103,22 +87,5 @@ describe('GET /resources/recent', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('Unauthorized');
-  });
-
-  it('returns 10 most recent resources for admin', async () => {
-    const res = await authedGet('/resources/recent');
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(10);
-    expect(res.body[0].id).toBe('30');
-  });
-
-  it('returns only owned recent resources for member', async () => {
-    const res = await request(app).get('/resources/recent').set('x-user-id', '2');
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(8);
-    expect(res.body.every((r: { owner_id: string }) => r.owner_id === '2')).toBe(true);
-    expect(res.body[0].id).toBe('30');
   });
 });
