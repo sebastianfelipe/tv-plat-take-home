@@ -15,6 +15,7 @@ export class UsersController {
 
   findUserResources = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // TODO: Add a filter validation process, similar to resources controller (where, limit, skip, order).
       const ownerId = Number(req.params.userId);
       const resources = await this.service.findUserResources(ownerId);
       res.json(resources);
