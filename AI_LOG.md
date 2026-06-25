@@ -2,7 +2,7 @@
 
 ## Tools used
 
-- **Cursor Agent** — project onboarding; Biome setup; domain/layer restructure; class + singleton wiring.
+- **Cursor Agent** — project onboarding; Biome setup; domain/layer restructure; class + singleton wiring; query validation scaffold.
 
 ## Representative prompts
 
@@ -13,6 +13,7 @@
 - "Reorganize by domain (screaming architecture); users in its own domain; separate interfaces."
 - "Keep `findResources` naming; use `{domain}.repository.ts` convention."
 - "Create classes with singleton DI; move route registration to each domain; don't export controller singletons."
+- "Stick with pg; add general FindQuery (where as JSON, limit, orderBy) with Joi validation at controller; service receives but does not use yet."
 
 ## Where I accepted / rejected / corrected AI output
 
@@ -26,8 +27,12 @@
 - **Rejected:** Exporting controller singletons from controller files — `getInstance()` called in route modules instead.
 - **Rejected:** Constructor-return singleton (Biome `noConstructorReturn`) — used private constructor + `getInstance()`.
 - **Corrected:** Restored CHALLENGE route comments in domain route files after restructure moves.
+- **Rejected:** Drizzle/TypeORM adoption — stayed on `pg` per challenge scope and SQL focus.
+- **Rejected:** First manual parameterized query pass (custom parsers + repository defaults) — too complex; reverted.
+- **Rejected:** Over-abstracted `FindResourcesQuery` / service preset split — reverted in favor of simpler incremental step.
+- **Accepted:** Shared `FindQuery<TWhere>` (`where` JSON + `limit` + `orderBy`); Joi `where` schema per endpoint (`resourcesWhereSchema`); `parseFindQueryFromRequest()` in controller; service accepts optional query without wiring repository yet.
 
 ## How I verified AI-generated code
 
 - Cross-checked onboarding summary against `src/*.ts`, migrations, seed, and tests.
-- Ran `npm run lint`, `npm run build`, and `npm test` after each restructure; all pass.
+- Ran `npm run lint`, `npm run build`, and `npm test` after each change; all pass (3 tests on `GET /resources` validation).

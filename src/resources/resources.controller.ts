@@ -1,5 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
+import { parseFindQueryFromRequest } from '../shared/query.validation';
 import { ResourcesService } from './resources.service';
+import { resourcesWhereSchema } from './resources.validation';
 
 export class ResourcesController {
   private static instance: ResourcesController | undefined;
@@ -15,9 +17,16 @@ export class ResourcesController {
     return ResourcesController.instance;
   }
 
-  findResources = async (_req: Request, res: Response, next: NextFunction) => {
+  findResources = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const resources = await this.service.findResources();
+      // TODO: Add this process as a middleware function.
+      const parsed = parseFindQueryFromRequest(req.query, resourcesWhereSchema);
+      if (!parsed.ok) {
+        res.status(400).json({ error: 'Invalid query parameters', details: parsed.errors });
+        return;
+      }
+
+      const resources = await this.service.findResources(parsed.value);
       res.json(resources);
     } catch (err) {
       next(err);
@@ -26,10 +35,7 @@ export class ResourcesController {
 
   findRecentResources = async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const resources = await this.service.findResources({
-        limit: 10,
-        orderBy: 'created_at desc',
-      });
+      const resources = await this.service.findRecentResources();
       res.json(resources);
     } catch (err) {
       next(err);

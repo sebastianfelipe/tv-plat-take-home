@@ -1,5 +1,7 @@
+import type { FindQuery } from '../shared/query.types';
 import { ResourcesRepository } from './resources.repository';
 import type { FindResourcesOpts, ResourceRow } from './resources.types';
+import type { ResourcesWhere } from './resources.where.types';
 
 export class ResourcesService {
   private static instance: ResourcesService | undefined;
@@ -15,7 +17,19 @@ export class ResourcesService {
     return ResourcesService.instance;
   }
 
-  findResources(opts: FindResourcesOpts = {}): Promise<ResourceRow[]> {
+  findResources(_query?: FindQuery<ResourcesWhere>): Promise<ResourceRow[]> {
+    return this.repository.findResources();
+  }
+
+  findRecentResources(): Promise<ResourceRow[]> {
+    return this.repository.findResources({
+      limit: 10,
+      orderBy: 'created_at desc',
+    });
+  }
+
+  findResourcesByOwner(ownerId: number): Promise<ResourceRow[]> {
+    const opts: FindResourcesOpts = { ownerId };
     return this.repository.findResources(opts);
   }
 }

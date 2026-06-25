@@ -25,4 +25,29 @@ describe('GET /resources', () => {
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toHaveLength(30);
   });
+
+  it('accepts validated where, limit, and orderBy query params', async () => {
+    const res = await request(app)
+      .get('/resources')
+      .query({
+        where: JSON.stringify({ type: 'doc', status: 'draft' }),
+        limit: 5,
+        orderBy: 'asc',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(30);
+  });
+
+  it('returns 400 for invalid query parameters', async () => {
+    const res = await request(app).get('/resources').query({
+      where: 'not-json',
+      limit: 0,
+      orderBy: 'sideways',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid query parameters');
+    expect(res.body.details.length).toBeGreaterThan(0);
+  });
 });

@@ -14,7 +14,7 @@ export class UsersService {
   }
 
   findUserResources(ownerId: number): Promise<ResourceRow[]> {
-    return this.resourcesService.findResources({ ownerId });
+    return this.resourcesService.findResourcesByOwner(ownerId);
   }
 }
 
