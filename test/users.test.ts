@@ -6,7 +6,8 @@ import { createApp } from '../src/app';
 import { pool } from '../src/db';
 import type { ResourcesService } from '../src/resources/resources.service';
 import type { UsersRepository } from '../src/users/users.repository';
-import { ForbiddenError, UsersService } from '../src/users/users.service';
+import { ForbiddenError } from '../src/shared/errors';
+import { UsersService } from '../src/users/users.service';
 import { UserRole } from '../src/users/users.types';
 
 const app = createApp();

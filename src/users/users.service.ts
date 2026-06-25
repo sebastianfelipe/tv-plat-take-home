@@ -1,15 +1,9 @@
-import { ResourcesRepository } from '../resources/resources.repository';
 import { ResourcesService } from '../resources/resources.service';
 import type { ResourceRow } from '../resources/resources.types';
+import { ForbiddenError } from '../shared/errors';
 import { UsersRepository } from './users.repository';
 import type { User } from './users.types';
 import { UserRole } from './users.types';
-
-export class ForbiddenError extends Error {
-  constructor() {
-    super('Forbidden');
-  }
-}
 
 export class UsersService {
   private static instance: UsersService | undefined;

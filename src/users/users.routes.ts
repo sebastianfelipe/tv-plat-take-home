@@ -1,4 +1,5 @@
 import type { Express } from 'express';
+import { asyncHandler } from '../middleware/async-handler';
 import { requireAuth } from '../middleware/auth';
 import { UsersController } from './users.controller';
 
@@ -12,5 +13,5 @@ export function registerUsersRoutes(app: Express): void {
   // user-scoped data and is the focus of access-control work. `/resources` and
   // `/resources/recent` remain open for now.
   // TODO: require auth on all endpoints once access control is wired globally.
-  app.get('/users/:userId/resources', requireAuth, controller.findUserResources);
+  app.get('/users/:userId/resources', requireAuth, asyncHandler(controller.findUserResources));
 }

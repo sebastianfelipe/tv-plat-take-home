@@ -28,6 +28,7 @@
 - "Apply same `buildRestrictedWhere` policy to `GET /resources/recent`; `findRecentResources` accepts only `restrictedWhere`."
 - "Validate user existence in `requireAuth` via `UsersService.findById`; reject unknown ids with 401."
 - "Remove `type` / `status` enum restrictions on resource filters — migration uses unconstrained `text` columns."
+- "Add global error handler and `asyncHandler` wrapper; move `ForbiddenError` to shared errors module."
 
 ## Assumptions
 
@@ -62,7 +63,7 @@
 - **Rejected:** Returning 401 from `authStub` for malformed headers — `authStub` is opt-in attachment only; `requireAuth` on protected routes handles rejection.
 - **Accepted:** Split `authStub` (attach valid `req.userId`) + async `requireAuth` (401 when unset or user not found via `UsersService.findById`); `requireAuth` on users and resources routes; path param validated with same `parseUserId()` helper.
 - **Accepted:** Unknown-but-well-formed `x-user-id` returns 401 from `requireAuth` (not 403 from `authorizeOwner`) — identity does not exist.
-- **Accepted:** `UsersService.authorizeOwner(userId, ownerId)` called from controller before `findUserResources`; `ForbiddenError` → 403 in controller.
+- **Accepted:** `UsersService.authorizeOwner(userId, ownerId)` called from controller before `findUserResources`; throws `ForbiddenError` → global `errorHandler` returns 403.
 - **Accepted:** `User` interface (`id`, `name`, `role`) in `users.types.ts`; `UsersRepository.findById()` returns full user row; `UsersService.findById()` as the service-layer lookup used by `authorizeOwner` and `ResourcesService.buildRestrictedWhere`.
 - **Accepted:** `ResourcesService` injects `UsersService` (optional in `getInstance` for tests); `UsersService.getInstance()` wires itself back into `ResourcesService` after bootstrap (resources routes register first in `app.ts`).
 - **Rejected:** Lazy `require()` for `UsersService` in `ResourcesService` — failed under Vitest; explicit singleton wiring instead.
@@ -72,7 +73,10 @@
 - **Accepted:** `GET /resources` controller calls `buildRestrictedWhere(userId)` then `findResources(filter, restrictedWhere)`; service merges `{ ...filter.where, ...restrictedWhere }` so access restrictions win on conflicts.
 - **Accepted:** `GET /resources/recent` controller calls `buildRestrictedWhere(userId)` then `findRecentResources(restrictedWhere)`; service applies `restrictedWhere` to the fixed preset (limit 10, `created_at desc`) with no caller-supplied filter.
 - **Rejected:** Separate `users.authorization.ts` module — kept `authorizeOwner` on `UsersService`.
-- **Rejected:** `{ ok: true | false }` return from `authorizeOwner` alongside `ForbiddenError` catch — service throws, controller catches once.
+- **Rejected:** `{ ok: true | false }` return from `authorizeOwner` alongside `ForbiddenError` catch — service throws, global handler maps errors.
+- **Accepted:** Global `errorHandler` in `middleware/error-handler.ts` registered last in `app.ts`; `HttpError` base + `ForbiddenError` in `shared/errors.ts`; unknown errors → 500.
+- **Accepted:** `asyncHandler` in `middleware/async-handler.ts` wraps async route handlers in domain route modules — controllers drop try/catch/`next(err)` boilerplate.
+- **Rejected:** Per-controller `ForbiddenError` catch blocks — centralized in error handler instead.
 - **Accepted:** Unit and integration tests for users domain in single `test/users.test.ts`.
 - **Accepted:** `UserRole` enum (`Member`, `Admin`) in `users.types.ts` — string values match postgres `role` column; used in `authorizeOwner` and tests.
 - **Corrected:** Dropped hardcoded `type` / `status` unions and Joi `.valid()` allowlists — `resources.type` and `resources.status` are plain `text` in `0001_init.sql`; `ResourcesWhere` and `resourcesWhereSchema` accept any string. Order field allowlist (`id`, `created_at`) unchanged.
