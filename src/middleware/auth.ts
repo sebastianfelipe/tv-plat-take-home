@@ -1,12 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-
-declare global {
-  namespace Express {
-    interface Request {
-      userId?: number;
-    }
-  }
-}
+import './express.types';
 
 // Auth STUB — there is no real authentication here. It simply reads the
 // `x-user-id` header and attaches it to the request.

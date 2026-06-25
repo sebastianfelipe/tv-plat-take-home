@@ -1,20 +1,5 @@
 import { pool } from '../db';
-
-export interface FindResourcesOpts {
-  ownerId?: number;
-  limit?: number;
-  orderBy?: string;
-}
-
-export interface ResourceRow {
-  id: string;
-  owner_id: string;
-  type: string;
-  status: string;
-  title: string;
-  created_at: Date;
-  updated_at: Date;
-}
+import type { FindResourcesOpts, ResourceRow } from './resources.types';
 
 // SHARED PATH — used by multiple endpoints. Changing this affects all callers.
 //

@@ -1,6 +1,7 @@
 import express from 'express';
-import { findResources } from './data/resources';
 import { authStub } from './middleware/auth';
+import * as resourcesController from './resources/resources.controller';
+import * as usersController from './users/users.controller';
 
 export function createApp() {
   const app = express();
@@ -11,37 +12,15 @@ export function createApp() {
   // Caller #1 of the shared findResources path.
   // Returns ALL resources — no filtering, no pagination, no input validation.
   // (See CHALLENGE.md, task 1.)
-  app.get('/resources', async (_req, res, next) => {
-    try {
-      const resources = await findResources();
-      res.json(resources);
-    } catch (err) {
-      next(err);
-    }
-  });
+  app.get('/resources', resourcesController.findResources);
 
   // GET /resources/recent
   // Caller #2 of the shared findResources path.
-  app.get('/resources/recent', async (_req, res, next) => {
-    try {
-      const resources = await findResources({ limit: 10, orderBy: 'created_at desc' });
-      res.json(resources);
-    } catch (err) {
-      next(err);
-    }
-  });
+  app.get('/resources/recent', resourcesController.findRecentResources);
 
   // GET /users/:userId/resources
   // Caller #3 of the shared findResources path.
-  app.get('/users/:userId/resources', async (req, res, next) => {
-    try {
-      const ownerId = Number(req.params.userId);
-      const resources = await findResources({ ownerId });
-      res.json(resources);
-    } catch (err) {
-      next(err);
-    }
-  });
+  app.get('/users/:userId/resources', usersController.findUserResources);
 
   return app;
 }
