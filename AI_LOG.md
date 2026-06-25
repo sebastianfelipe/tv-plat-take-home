@@ -1,23 +1,19 @@
 # AI Usage Log
 
-> Required deliverable. Be honest and specific — this is about process, not
-> about whether you used AI (you're encouraged to). Delete these hints.
-
 ## Tools used
 
-_Which assistants/agents/extensions, and roughly for what._
+- **Cursor Agent** — project onboarding: architecture summary and CHALLENGE → file mapping before coding.
 
 ## Representative prompts
 
-_A handful of the actual prompts that did real work. Paste them._
+- "Summarize this project, focus on `src/`. Big picture for contributing to CHALLENGE.md. Document important prompts and decisions in AI_LOG.md; keep AI usage simple and concise."
 
 ## Where I accepted / rejected / corrected AI output
 
-_Concrete examples: a suggestion you took as-is, one you rejected and why, one
-you had to correct._
+- **Accepted:** `src/` layout, shared `findResources()` blast radius across three endpoints, seed/test baseline (30 resources, 5 shares), and which files each CHALLENGE task likely touches.
+- **Rejected:** N/A — no implementation or SQL generated yet.
 
 ## How I verified AI-generated code
 
-_Especially **SQL** and **tests**: how did you confirm the queries return the
-right rows and the tests actually test what they claim? (e.g. ran against
-seed data, checked `EXPLAIN`, wrote a failing case first, manual `curl`.)_
+- Cross-checked the summary against `src/*.ts`, `migrations/0001_init.sql`, `scripts/seed.ts`, and `test/resources.test.ts`.
+- For upcoming SQL/tests: run against seed data, `npm test`, and manual `curl -H 'x-user-id: N'`.
