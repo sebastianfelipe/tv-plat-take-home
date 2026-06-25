@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../src/app';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../scripts/migrate';
 import { seed } from '../scripts/seed';
+import { createApp } from '../src/app';
 import { pool } from '../src/db';
 
 const app = createApp();

@@ -1,6 +1,6 @@
 import express from 'express';
-import { authStub } from './middleware/auth';
 import { findResources } from './data/resources';
+import { authStub } from './middleware/auth';
 
 export function createApp() {
   const app = express();

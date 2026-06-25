@@ -21,9 +21,7 @@ export interface ResourceRow {
 // There is NO access control here: every caller sees every resource it asks
 // for, regardless of who is making the request. The auth stub populates
 // req.userId but it never reaches this function.
-export async function findResources(
-  opts: FindResourcesOpts = {},
-): Promise<ResourceRow[]> {
+export async function findResources(opts: FindResourcesOpts = {}): Promise<ResourceRow[]> {
   const params: unknown[] = [];
   let sql = `
     SELECT id, owner_id, type, status, title, created_at, updated_at

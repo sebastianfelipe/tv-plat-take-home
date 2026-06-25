@@ -53,15 +53,13 @@ export async function seed(): Promise<void> {
   }
 
   for (const s of SHARES) {
-    await pool.query(
-      'INSERT INTO resource_shares (resource_id, user_id) VALUES ($1, $2)',
-      [s.resourceId, s.userId],
-    );
+    await pool.query('INSERT INTO resource_shares (resource_id, user_id) VALUES ($1, $2)', [
+      s.resourceId,
+      s.userId,
+    ]);
   }
 
-  console.log(
-    `seeded ${USERS.length} users, ${RESOURCE_COUNT} resources, ${SHARES.length} shares`,
-  );
+  console.log(`seeded ${USERS.length} users, ${RESOURCE_COUNT} resources, ${SHARES.length} shares`);
 }
 
 if (require.main === module) {
